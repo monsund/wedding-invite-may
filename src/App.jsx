@@ -26,6 +26,24 @@ const EVENTS = C.events.map((e) => {
   };
 });
 
+// The reception is a timed entry (India time) at the bride's venue unless config says otherwise
+const RECEPTION = (() => {
+  const r = { ...C.events[0], ...C.reception };
+  const date = toDate(r.date);
+  const where = r.address || r.place;
+  const at = (hm) => ymd(date) + "T" + hm.replace(":", "") + "00";
+  return {
+    ...r,
+    date,
+    mapUrl: r.mapLink || "https://www.google.com/maps/search/?api=1&query=" + enc(where),
+    calUrl:
+      "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+      `&text=${enc(names + "’s wedding, " + r.title)}&dates=${at(r.start)}/${at(r.end)}&ctz=Asia/Kolkata` +
+      `&location=${enc(where)}` +
+      `&details=${enc("Invitation to the " + r.title.toLowerCase() + " at the " + r.host.toLowerCase() + ", " + r.time + ".")}`,
+  };
+})();
+
 function Sprig() {
   return (
     <svg className="sprig" viewBox="0 0 92 120" fill="none" aria-hidden="true">
@@ -355,16 +373,16 @@ function Cover({ onDone }) {
   const [gone, setGone] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    // Once gone, stay put: onDone is a new function on each App render, which re-runs this
+    if (!open || gone) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const t = setTimeout(() => {
       setGone(true);
       onDone();
-      window.scrollTo(0, 0);
-      document.getElementById("screen")?.scrollTo(0, 0);
+      document.getElementById("screen")?.scrollTo({ top: 0, behavior: "instant" });
     }, reduce ? 50 : 4800);
     return () => clearTimeout(t);
-  }, [open, onDone]);
+  }, [open, gone, onDone]);
 
   return (
     <div id="intro" className={[open && "open", gone && "gone"].filter(Boolean).join(" ")}
@@ -567,7 +585,7 @@ function SaveTheDate({ who }) {
 
 function Hero() {
   return (
-    <section className="page hero" id="top">
+    <section className="page hero" id="top" data-title="We’re getting married">
       <PageBg motif="garland" />
       <Sprig />
       <p className="lead">We’re getting married</p>
@@ -854,7 +872,7 @@ function Photobomb() {
 
 function Welcome() {
   return (
-    <section className="page welcome">
+    <section className="page welcome" data-title={C.welcomeTitle}>
       <PageBg motif="lotus" />
       <h2>{C.welcomeTitle}</h2>
       {/* <p className="sub">A note from us</p> */}
@@ -1115,7 +1133,7 @@ function MapReader({ who }) {
 
 function Venue() {
   return (
-    <section className="page">
+    <section className="page" data-title="The venues">
       <PageBg motif="clouds" />
       <h2>The venues</h2>
       <p className="sub">Where to find us</p>
@@ -1135,6 +1153,40 @@ function Venue() {
           </Fragment>
         ))}
       </div>
+    </section>
+  );
+}
+
+function Reception() {
+  const r = RECEPTION;
+  return (
+    <section className="page reception" data-title="The reception">
+      <PageBg motif="garland" />
+      <h2>The reception</h2>
+      <p className="sub">{r.title}</p>
+      <div className="save">
+        <p className="save-month">{fmt(r.date, { month: "long", year: "numeric" })}</p>
+        <ul className="save-days one">
+          <li>
+            <span className="save-wd">{fmt(r.date, { weekday: "long" })}</span>
+            <strong>{fmt(r.date, { day: "numeric" })}</strong>
+            <span className="save-time">{r.time}</span>
+            <span className="save-place">{r.place}</span>
+            <span className="save-host">{r.host}</span>
+            <a className="cal-btn" href={r.calUrl} target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+                <path d="M3.5 10h17M8 3v4M16 3v4M12 13v5M9.5 15.5h5" />
+              </svg>
+              Add to calendar
+            </a>
+            <SaveTheDate who="bride" />
+          </li>
+        </ul>
+      </div>
+      {r.address && <p className="addr">{r.address}</p>}
+      <a className="btn ghost" href={r.mapUrl} target="_blank" rel="noopener noreferrer">Open in Maps</a>
     </section>
   );
 }
@@ -1215,7 +1267,7 @@ function Farewell() {
 
 function Footer() {
   return (
-    <footer className="page closing">
+    <footer className="page closing" data-title="With love">
       <PageBg motif="lanterns" />
       <Monogram />
       <p className="closing-with">{C.closing}</p>
@@ -1235,6 +1287,90 @@ function Footer() {
   );
 }
 
+/* ---------- Pager: the screen snaps one page at a time ---------- */
+// Page dots down the right edge and a pill at the bottom naming the next page; arrow keys,
+// Page Up/Down and Space also step a page. Titles come from each page's data-title.
+const screenEl = () => document.getElementById("screen");
+const pagesOf = (screen) => [...screen.querySelectorAll(".page")];
+const topOf = (screen, page) =>
+  page.getBoundingClientRect().top - screen.getBoundingClientRect().top + screen.scrollTop;
+// The page covering the middle of the screen
+function pageAt(screen) {
+  const mid = screen.scrollTop + screen.clientHeight / 2;
+  return Math.max(0, pagesOf(screen).filter((p) => topOf(screen, p) <= mid).length - 1);
+}
+function goTo(i) {
+  const screen = screenEl(), pages = pagesOf(screen);
+  screen.scrollTo({ top: topOf(screen, pages[Math.max(0, Math.min(i, pages.length - 1))]) });
+}
+const STEP = { ArrowDown: 1, PageDown: 1, " ": 1, ArrowUp: -1, PageUp: -1 };
+
+// Shrinks the content of any page taller than the screen so each page fills exactly one
+// screen. A few passes, since text wraps differently once it is smaller. Never below
+// MIN_FIT, to keep text readable; on very short screens such a page scrolls a little instead.
+const MIN_FIT = 0.72;
+function fitPages() {
+  const screen = screenEl();
+  for (const page of pagesOf(screen)) {
+    page.style.removeProperty("--fit");
+    let fit = 1;
+    for (let i = 0; i < 3 && fit > MIN_FIT && page.offsetHeight > screen.clientHeight + 1; i++) {
+      const s = getComputedStyle(page);
+      const pad = parseFloat(s.paddingTop) + parseFloat(s.paddingBottom);
+      fit = Math.max(MIN_FIT, fit * (screen.clientHeight - pad) / (page.offsetHeight - pad));
+      page.style.setProperty("--fit", fit.toFixed(3));
+    }
+  }
+}
+
+function Pager() {
+  const [titles, setTitles] = useState([]);
+  const [at, setAt] = useState(0);
+
+  useEffect(() => {
+    const screen = screenEl();
+    setTitles(pagesOf(screen).map((p) => p.dataset.title));
+    const onScroll = () => setAt(pageAt(screen));
+    onScroll();
+    const onKey = (e) => {
+      // Space still presses a focused button or link
+      if (!STEP[e.key] || (e.key === " " && e.target.closest?.("a, button"))) return;
+      e.preventDefault();
+      goTo(pageAt(screen) + STEP[e.key]);
+    };
+    screen.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      screen.removeEventListener("scroll", onScroll);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  const last = at === titles.length - 1;
+  return (
+    <nav className="pager" aria-label="Pages">
+      <ol className="dots">
+        {titles.map((t, i) => (
+          <li key={t}>
+            <button aria-label={t} aria-current={i === at ? "page" : undefined} onClick={() => goTo(i)} />
+          </li>
+        ))}
+      </ol>
+      <button className={"next" + (last ? " up" : "")} onClick={() => {
+        const i = pageAt(screenEl());
+        goTo(i === titles.length - 1 ? 0 : i + 1);
+      }}>
+        <span className="next-label">{last ? "Back to" : "Next"}</span>
+        <span className="next-title">{last ? "the start" : titles[at + 1]}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+    </nav>
+  );
+}
+
 /* ---------- App ---------- */
 export default function App() {
   const [unlocked, setUnlocked] = useState(false);
@@ -1247,6 +1383,13 @@ export default function App() {
     document.body.classList.toggle("locked", !unlocked);
   }, [unlocked]);
 
+  useEffect(() => {
+    const ro = new ResizeObserver(() => fitPages());
+    ro.observe(screenEl());
+    document.fonts?.ready.then(fitPages);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div className="device">
       <Cover onDone={() => setUnlocked(true)} />
@@ -1255,9 +1398,11 @@ export default function App() {
           <Hero />
           <Welcome />
           <Venue />
+          <Reception />
           <Footer />
         </main>
       </div>
+      {unlocked && <Pager />}
     </div>
   );
 }

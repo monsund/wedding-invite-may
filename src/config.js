@@ -1,8 +1,8 @@
 // EDIT THIS FILE: every detail on the invitation comes from here.
 
 export const CONFIG = {
-  partner1: "Monsoon", // bride, shown on the left of the cover
-  partner2: "Mayuri", // groom, shown on the right
+  partner1: "Mayuri", // bride, shown on the left of the cover
+  partner2: "Monsoon", // groom, shown on the right
 
   welcomeTitle: "To the big day",
   welcomeText:
@@ -28,6 +28,14 @@ export const CONFIG = {
         "https://www.google.com/maps/place/The+Dibragede+Residence/@25.3138753,93.1262074,795m/data=!3m2!1e3!4b1!4m6!3m5!1s0x374f750020aa754d:0xfa4e49bd07413d83!8m2!3d25.3138705!4d93.1310783!16s%2Fg%2F11zbj288ll?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D",
     },
   ],
+
+  // Reception, on its own page after the venues. It is held at the bride’s venue above;
+  // to hold it elsewhere, add place, host, address and mapLink here.
+  reception: {
+    title: "Bride’s reception",
+    date: "2027-01-12", time: "5 pm onwards",
+    start: "17:00", end: "22:00", // India time, for the calendar entry only
+  },
 
   closing: "With love,",
   closingNote: "We can’t wait to celebrate with you.",

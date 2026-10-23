@@ -16,8 +16,18 @@ body{
   font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;
 }
 body.locked{overflow:hidden}
-/* Layout: phone-width column; on desktop, a fixed portrait frame that scrolls inside */
-.device{position:relative}
+/* Layout: phone-width column; on desktop, a fixed portrait frame. Either way the screen
+   scrolls inside and snaps one page at a time. */
+.device{position:relative;--screen-h:calc(100svh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+.screen{
+  height:var(--screen-h);overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;
+  scroll-snap-type:y mandatory;scrollbar-width:none;
+}
+.screen::-webkit-scrollbar{display:none}
+body.locked .screen{overflow:hidden}
+.page{scroll-snap-align:start;scroll-snap-stop:always}
+/* --fit is set by fitPages() on a page whose content is taller than the screen */
+.page > :not(.page-bg){zoom:var(--fit,1)}
 .app{max-width:480px;margin:0 auto;background:var(--bg);container-type:inline-size}
 @media (min-width:520px){
   body{background:#F0E9E1}
@@ -39,12 +49,7 @@ body.locked{overflow:hidden}
       0 0 0 1px var(--line),
       0 40px 90px -30px rgba(58,38,48,.28),0 12px 30px -12px rgba(58,38,48,.14);
   }
-  .screen{
-    height:100%;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;
-    scrollbar-width:none;
-  }
-  .screen::-webkit-scrollbar{display:none}
-  body.locked .screen{overflow:hidden}
+  .screen{height:100%}
   .app{max-width:none;box-shadow:none}
   .device #intro{position:absolute}
 }
@@ -52,14 +57,14 @@ h1,h2,h3,.serif{font-family:"Cormorant Garamond",Georgia,"Times New Roman",serif
 
 /* Pages */
 .page{
-  min-height:var(--screen-h,100svh);padding:72px 32px;
+  min-height:var(--screen-h,100svh);padding:52px 32px 80px; /* bottom leaves room for the next-page pill */
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;position:relative;
 }
 .page h2{font-size:clamp(40px,12cqi,54px);line-height:1.05;letter-spacing:.005em;margin-bottom:10px}
 .sub{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:21px;color:var(--rose);margin:0 0 36px}
 .body{max-width:34ch;color:var(--muted);margin:0 auto}
-.welcome{padding-top:48px;padding-bottom:44px}
+.welcome{padding-top:48px}
 .welcome .sub{margin-bottom:22px}
 .countdown{margin-top:26px;width:100%;max-width:320px}
 .countdown-title,.countdown-done{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:21px;color:var(--rose);margin:0 0 8px}
@@ -171,7 +176,7 @@ h1,h2,h3,.serif{font-family:"Cormorant Garamond",Georgia,"Times New Roman",serif
 .corner.tr{top:8px;right:8px;transform:scaleX(-1)}
 .corner.bl{bottom:8px;left:8px;transform:scaleY(-1)}
 .corner.br{bottom:8px;right:8px;transform:scale(-1)}
-.hero{padding-top:56px;padding-bottom:52px}
+.hero{padding-top:56px}
 .hero .lead{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:22px;color:var(--rose);margin:0 0 14px}
 .hero h1{font-size:clamp(54px,17cqi,78px);line-height:.98}
 .hero .amp{display:block;font-style:italic;font-size:.55em;color:var(--rose);margin:4px 0}
@@ -220,6 +225,44 @@ h1,h2,h3,.serif{font-family:"Cormorant Garamond",Georgia,"Times New Roman",serif
 /* Venue */
 .venue-name{font-family:"Cormorant Garamond",Georgia,serif;font-size:30px;margin:0 0 6px}
 .addr{color:var(--muted);margin:0 0 18px;max-width:30ch}
+
+/* Reception */
+.save-days.one{grid-template-columns:1fr}
+.save-days.one .says{width:170px;margin:4px auto 0}
+.save-time{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:21px;color:var(--rose);margin:2px 0 6px}
+.reception .addr{margin:14px auto 16px}
+
+/* Pager: page dots outside the gold frame on the right, and a "next page" pill at the bottom */
+.pager{position:absolute;inset:0;max-width:480px;margin:0 auto;z-index:20;pointer-events:none}
+.pager button{pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dots{
+  list-style:none;margin:0;padding:0;position:absolute;right:0;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;
+}
+.dots button{display:grid;place-items:center;width:16px;height:20px;padding:0;border:0;background:none}
+.dots button::before{
+  content:"";width:6px;height:6px;border-radius:3px;
+  background:color-mix(in srgb,var(--gold) 55%,transparent);transition:height .25s ease, background .25s ease;
+}
+.dots button[aria-current]::before{height:16px;background:var(--rose)}
+.dots button:focus-visible{outline:2px solid var(--sage);outline-offset:-2px;border-radius:4px}
+.next{
+  position:absolute;left:50%;bottom:24px;transform:translateX(-50%);
+  display:flex;align-items:center;gap:7px;white-space:nowrap;
+  padding:7px 10px 7px 15px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--gold) 60%,transparent);
+  background:color-mix(in srgb,var(--paper) 86%,transparent);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  box-shadow:0 6px 16px -10px rgba(58,38,48,.45);
+  color:var(--rose);font:inherit;transition:box-shadow .15s ease;
+}
+.next:hover{box-shadow:0 10px 20px -10px rgba(58,38,48,.55)}
+.next:focus-visible{outline:3px solid var(--sage);outline-offset:3px}
+.next-label{font-size:10.5px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.next-title{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:17px;line-height:1}
+.next svg{width:16px;height:16px;flex:none;animation:nudge 2s ease-in-out infinite}
+.next.up svg{transform:rotate(180deg);animation:none}
+@keyframes nudge{0%,100%{transform:none}50%{transform:translateY(3px)}}
 .venues{display:grid;gap:40px}
 .venue{position:relative}
 .mapper{position:absolute;bottom:-4px;width:72px;height:auto;overflow:visible;pointer-events:none}
@@ -261,7 +304,6 @@ h1,h2,h3,.serif{font-family:"Cormorant Garamond",Georgia,"Times New Roman",serif
 @keyframes wave-hand{from{transform:rotate(-25deg)}to{transform:rotate(25deg)}}
 
 /* Closing card */
-.closing{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
 .closing .mono{width:min(40cqi,150px);margin-bottom:10px}
 .closing-with{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:26px;color:var(--rose);margin:0 0 4px}
 .closing-names{
@@ -443,7 +485,7 @@ h1,h2,h3,.serif{font-family:"Cormorant Garamond",Georgia,"Times New Roman",serif
 
 @media (prefers-reduced-motion: reduce){
   html,.screen{scroll-behavior:auto}
-  .knot,.tap,.tap::after,.shine,.mono p,.garland .str,.sparkle,.bob,.note,.say,.caption,.flash,.finder,.lotus,.petal,.petal svg,.cloud,.lantern,.lantern svg,.glint,.seam,.wave-arm,.kid-hop,.sky-lantern,.sky-sway,.cheer,.snap,.mapper-fig,.mapper-head,.paper,.paper-pin,.train,.steam circle,.wave-hand,.ph,.ph-cap,.ph-wave,.cam,.burst,.says-bubble,.says-fig,.open .hold{animation:none}
+  .knot,.tap,.tap::after,.shine,.mono p,.garland .str,.sparkle,.bob,.note,.say,.caption,.flash,.finder,.lotus,.petal,.petal svg,.cloud,.lantern,.lantern svg,.glint,.seam,.wave-arm,.kid-hop,.sky-lantern,.sky-sway,.cheer,.snap,.mapper-fig,.mapper-head,.paper,.paper-pin,.train,.steam circle,.wave-hand,.ph,.ph-cap,.ph-wave,.cam,.burst,.says-bubble,.says-fig,.open .hold,.next svg{animation:none}
   .train{transform:translateX(60px)}
   .mapper-say{animation:none!important;opacity:0}
   .actor,.kid,.door,.rb,.bow,.wrap,#intro,.btn{transition-duration:.01s!important;transition-delay:0s!important}
